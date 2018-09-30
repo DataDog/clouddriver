@@ -127,6 +127,7 @@ subprojects { project ->
   dependencies {
     compile spinnaker.dependency('groovy')
     spinnaker.group('test')
+    compile group: 'com.datadoghq', name: 'dd-java-agent', version: "0.16.0"
   }
 }
 
