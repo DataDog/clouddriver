@@ -88,6 +88,8 @@ allprojects {
   dependencies {
     if (project.getProperty('includeDatadogTracing') == 'true') {
       compile group: 'com.datadoghq', name: 'dd-trace-api', version: "0.16.0"
+    }
+    if (project.getProperty('includeDatadogJavaAgent') == 'true') {
       compile group: 'com.datadoghq', name: 'dd-java-agent', version: "0.16.0"
     }
   }
