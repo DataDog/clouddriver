@@ -84,6 +84,13 @@ allprojects {
     minHeapSize = "512m"
     maxHeapSize = "512m"
   }
+
+  dependencies {
+    if (project.getProperty('includeDatadogTracing') == 'true') {
+      compile group: 'com.datadoghq', name: 'dd-trace-api', version: "0.16.0"
+      compile group: 'com.datadoghq', name: 'dd-java-agent', version: "0.16.0"
+    }
+  }
 }
 
 subprojects { project ->
@@ -127,8 +134,6 @@ subprojects { project ->
   dependencies {
     compile spinnaker.dependency('groovy')
     spinnaker.group('test')
-    compile group: 'com.datadoghq', name: 'dd-trace-api', version: "0.16.0"
-    compile group: 'com.datadoghq', name: 'dd-java-agent', version: "0.16.0"
   }
 }
 
