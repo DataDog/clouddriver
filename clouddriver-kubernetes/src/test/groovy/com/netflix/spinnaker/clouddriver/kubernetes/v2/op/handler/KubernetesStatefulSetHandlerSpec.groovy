@@ -96,17 +96,13 @@ status:
     def statefulSetDeployer = new KubernetesStatefulSetHandler()
     statefulSetDeployer.versioned() >> true
     statefulSetDeployer.kind() >> KIND
-    def versionedArtifactConverterMock = Mock(KubernetesVersionedArtifactConverter)
-    versionedArtifactConverterMock.getDeployedName(_) >> "$NAME-$VERSION"
-    versionedArtifactConverterMock.toArtifact(_, _, _) >> new Artifact()
+
     def registry = new KubernetesResourcePropertyRegistry(Collections.singletonList(statefulSetDeployer),
       new KubernetesSpinnakerKindMap())
 
     NamerRegistry.lookup().withProvider(KubernetesCloudProvider.ID)
       .withAccount(ACCOUNT)
       .setNamer(KubernetesManifest.class, new KubernetesManifestNamer())
-
-    registry.get("any", KubernetesKind.STATEFUL_SET).versionedConverter = versionedArtifactConverterMock
 
     def deployOp = new KubernetesDeployManifestOperation(deployDescription, registry, null)
 
