@@ -94,7 +94,7 @@ status:
     credentials.deploy(_, _) >> null
 
     def statefulSetDeployer = new KubernetesStatefulSetHandler()
-    statefulSetDeployer.versioned() >> true
+    statefulSetDeployer.versioned() >> false
     statefulSetDeployer.kind() >> KIND
 
     def registry = new KubernetesResourcePropertyRegistry(Collections.singletonList(statefulSetDeployer),
