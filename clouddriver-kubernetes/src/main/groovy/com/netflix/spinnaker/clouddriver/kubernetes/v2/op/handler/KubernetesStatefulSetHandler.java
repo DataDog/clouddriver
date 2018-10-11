@@ -27,6 +27,7 @@ import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.KubernetesSpi
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesKind;
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesManifest;
 import com.netflix.spinnaker.clouddriver.model.Manifest.Status;
+import io.kubernetes.client.models.V1beta2RollingUpdateStatefulSetStrategy;
 import io.kubernetes.client.models.V1beta2StatefulSet;
 import io.kubernetes.client.models.V1beta2StatefulSetStatus;
 import org.apache.commons.lang3.StringUtils;
@@ -142,6 +143,18 @@ public class KubernetesStatefulSetHandler extends KubernetesHandler implements
     existing = status.getReadyReplicas();
     if (existing == null || (desiredReplicas != null && desiredReplicas > existing)) {
       return result.unstable("Waiting for all updated replicas to be ready");
+    }
+
+    String updateType = statefulSet.getSpec().getUpdateStrategy().getType();
+    V1beta2RollingUpdateStatefulSetStrategy rollingUpdate = statefulSet.getSpec().getUpdateStrategy().getRollingUpdate();
+    if (updateType.equalsIgnoreCase("rollingupdate")) {
+      Integer replicas = status.getReplicas();
+      Integer updated = status.getUpdatedReplicas();
+      if (replicas != null && rollingUpdate.getPartition() != null && (updated < (replicas - rollingUpdate.getPartition()))) {
+        return result.unstable("Waiting for partitioned roll out to finish");
+      }
+      result.setStable(new Status.Condition(true,"Partitioned roll out complete"));
+      return result;
     }
 
     return result;
