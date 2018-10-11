@@ -150,7 +150,8 @@ public class KubernetesStatefulSetHandler extends KubernetesHandler implements
     if (updateType.equalsIgnoreCase("rollingupdate")) {
       Integer replicas = status.getReplicas();
       Integer updated = status.getUpdatedReplicas();
-      if (replicas != null && rollingUpdate.getPartition() != null && (updated < (replicas - rollingUpdate.getPartition()))) {
+      Integer partition = rollingUpdate.getPartition();
+      if (replicas != null && partition != null && (updated < (replicas - partition))) {
         return result.unstable("Waiting for partitioned roll out to finish");
       }
       result.setStable(new Status.Condition(true,"Partitioned roll out complete"));
