@@ -260,9 +260,19 @@ public class KubernetesManifest extends HashMap<String, Object> {
   }
 
   public boolean isNewerThanObservedGeneration() {
-    Integer generation = (Integer) getMetadata().get("generation");
+    Object generationObj = getMetadata().get("generation");
+    if (generationObj == null) {
+      return false;
+    }
+
+    if (!(generationObj instanceof Integer)) {
+      throw new IllegalStateException("Expected metadata.generation to be an Integer but was actually a " + generationObj.getClass());
+    }
+
+    Integer generation = (Integer) generationObj;
+
     Integer observedGeneration = ((Map<String, Integer>) getStatus()).get("observedGeneration");
-    return !(observedGeneration == null || (generation != null && generation > observedGeneration));
+    return !(observedGeneration == null || (generation > observedGeneration));
   }
 
   /*
