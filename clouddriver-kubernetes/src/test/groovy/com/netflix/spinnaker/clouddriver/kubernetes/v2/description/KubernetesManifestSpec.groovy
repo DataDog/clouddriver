@@ -43,6 +43,7 @@ kind: $KIND
 metadata:
   name: $NAME
   namespace: $NAMESPACE
+  generation: 1
 spec:
   template:
     metadata:
@@ -80,5 +81,29 @@ spec:
     "service abc"    || KubernetesKind.SERVICE     | "abc"
     "SERVICE abc"    || KubernetesKind.SERVICE     | "abc"
     "ingress abc"    || KubernetesKind.INGRESS     | "abc"
+  }
+
+  void "correctly reads observedGeneration from status"() {
+    when:
+    def statusYaml = """
+status:
+ observedGeneration: 1
+"""
+    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET + statusYaml)
+
+    then:
+    manifest.getObservedGeneration() == 1
+  }
+
+  void "correctly determines isNewerThanObservedGeneration"() {
+    when:
+    def statusYaml = """
+status:
+ observedGeneration: 2
+"""
+    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET + statusYaml)
+
+    then:
+    manifest.isNewerThanObservedGeneration()
   }
 }

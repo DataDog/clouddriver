@@ -251,6 +251,22 @@ public class KubernetesManifest extends HashMap<String, Object> {
   }
 
   @JsonIgnore
+  public Integer getObservedGeneration() {
+    Object statusObj = getStatus();
+    if (!(statusObj instanceof Map)) {
+      throw new IllegalStateException("Expected status to be a Map but was actually a " + statusObj.getClass());
+    }
+    Map<String, Object> status = (Map<String, Object>) statusObj;
+
+    Object observedGenObj = status.get("observedGeneration");
+
+    if (!(observedGenObj instanceof Integer)) {
+      throw new IllegalStateException("Expected status.observedGeneration to be an Integer but was actually a " + observedGenObj.getClass());
+    }
+    return (Integer) observedGenObj;
+  }
+
+  @JsonIgnore
   public String getFullResourceName() {
     return getFullResourceName(getKind(), getName());
   }
@@ -259,6 +275,7 @@ public class KubernetesManifest extends HashMap<String, Object> {
     return String.join(" ", kind.toString(), name);
   }
 
+  @JsonIgnore
   public boolean isNewerThanObservedGeneration() {
     Object generationObj = getMetadata().get("generation");
     if (generationObj == null) {
@@ -271,8 +288,13 @@ public class KubernetesManifest extends HashMap<String, Object> {
 
     Integer generation = (Integer) generationObj;
 
-    Integer observedGeneration = ((Map<String, Integer>) getStatus()).get("observedGeneration");
-    return !(observedGeneration == null || (generation > observedGeneration));
+    Integer observedGeneration = getObservedGeneration();
+
+    if (observedGeneration == null) {
+      return false;
+    }
+
+    return !(generation > observedGeneration);
   }
 
   /*
