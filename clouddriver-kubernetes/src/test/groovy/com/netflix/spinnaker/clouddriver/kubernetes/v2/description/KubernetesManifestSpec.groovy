@@ -95,15 +95,23 @@ status:
     manifest.getObservedGeneration() == 1
   }
 
+  void "correctly reads generation from manifest"() {
+    when:
+    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET)
+
+    then:
+    manifest.getGeneration() == 1
+  }
+
   void "correctly determines isNewerThanObservedGeneration"() {
     when:
     def statusYaml = """
 status:
- observedGeneration: 2
+ observedGeneration: 1
 """
     KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET + statusYaml)
 
     then:
-    manifest.isNewerThanObservedGeneration()
+    !manifest.isNewerThanObservedGeneration()
   }
 }

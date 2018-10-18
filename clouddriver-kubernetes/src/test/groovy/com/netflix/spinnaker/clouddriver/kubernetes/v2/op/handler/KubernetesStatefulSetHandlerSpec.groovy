@@ -58,7 +58,7 @@ spec:
     return objectMapper.convertValue(yaml.load(input), KubernetesManifest)
   }
 
-  def "statefulset stable state is null if generation > observedGeneration"() {
+  def "statefulset stable state is null if manifest.isNewerThanObservedGeneration()"() {
     when:
     def statusYaml = """
 status:
