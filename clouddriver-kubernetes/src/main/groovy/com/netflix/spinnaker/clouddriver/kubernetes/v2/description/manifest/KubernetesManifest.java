@@ -251,7 +251,7 @@ public class KubernetesManifest extends HashMap<String, Object> {
   }
 
   @JsonIgnore
-  public Integer getObservedGeneration() {
+  public Double getObservedGeneration() {
     Object statusObj = getStatus();
     if (!(statusObj instanceof Map)) {
       throw new IllegalStateException("Expected status to be a Map but was actually a " + statusObj.getClass());
@@ -260,20 +260,20 @@ public class KubernetesManifest extends HashMap<String, Object> {
 
     Object observedGenObj = status.get("observedGeneration");
 
-    if (!(observedGenObj instanceof Integer)) {
-      throw new IllegalStateException("Expected status.observedGeneration to be an Integer but was actually a " + observedGenObj.getClass());
+    if (!(observedGenObj instanceof Double)) {
+      throw new IllegalStateException("Expected status.observedGeneration to be an Double but was actually a " + observedGenObj.getClass());
     }
-    return (Integer) observedGenObj;
+    return (Double) observedGenObj;
   }
 
   @JsonIgnore
-  public Integer getGeneration() {
+  public Double getGeneration() {
     Object generationObj = getMetadata().get("generation");
 
-    if (!(generationObj instanceof Integer)) {
-      throw new IllegalStateException("Expected metadata.generation to be an Integer but was actually a " + generationObj.getClass());
+    if (!(generationObj instanceof Double)) {
+      throw new IllegalStateException("Expected metadata.generation to be an Double but was actually a " + generationObj.getClass());
     }
-    return (Integer) generationObj;
+    return (Double) generationObj;
   }
 
   @JsonIgnore
@@ -287,10 +287,10 @@ public class KubernetesManifest extends HashMap<String, Object> {
 
   @JsonIgnore
   public boolean isNewerThanObservedGeneration() {
-    Integer generation = getGeneration();
-    Integer observedGeneration = getObservedGeneration();
+    Double generation = getGeneration();
+    Double observedGeneration = getObservedGeneration();
 
-    if (observedGeneration == null || generation == null) {
+    if (observedGeneration == null || generation == null || generation < 1.0) {
       return false;
     }
 

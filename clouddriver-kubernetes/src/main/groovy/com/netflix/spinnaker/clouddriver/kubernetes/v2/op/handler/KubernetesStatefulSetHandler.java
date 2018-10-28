@@ -131,15 +131,6 @@ public class KubernetesStatefulSetHandler extends KubernetesHandler implements
       return result.unstable("Waiting for at least the desired replica count to be met");
     }
 
-    if (!status.getCurrentRevision().equals(status.getUpdateRevision())) {
-      return result.unstable("Waiting for the updated revision to match the current revision");
-    }
-
-    existing = status.getCurrentReplicas();
-    if (existing == null || (desiredReplicas != null && desiredReplicas > existing)) {
-      return result.unstable("Waiting for all updated replicas to be scheduled");
-    }
-
     existing = status.getReadyReplicas();
     if (existing == null || (desiredReplicas != null && desiredReplicas > existing)) {
       return result.unstable("Waiting for all updated replicas to be ready");
@@ -147,15 +138,26 @@ public class KubernetesStatefulSetHandler extends KubernetesHandler implements
 
     String updateType = statefulSet.getSpec().getUpdateStrategy().getType();
     V1beta2RollingUpdateStatefulSetStrategy rollingUpdate = statefulSet.getSpec().getUpdateStrategy().getRollingUpdate();
-    if (updateType.equalsIgnoreCase("rollingupdate")) {
-      Integer replicas = status.getReplicas();
-      Integer updated = status.getUpdatedReplicas();
+
+    Integer updated = status.getUpdatedReplicas();
+
+    if (updateType.equalsIgnoreCase("rollingupdate") && updated != null && rollingUpdate != null) {
       Integer partition = rollingUpdate.getPartition();
+      Integer replicas = status.getReplicas();
       if (replicas != null && partition != null && (updated < (replicas - partition))) {
         return result.unstable("Waiting for partitioned roll out to finish");
       }
       result.setStable(new Status.Condition(true,"Partitioned roll out complete"));
       return result;
+    }
+
+    existing = status.getCurrentReplicas();
+    if (existing == null || (desiredReplicas != null && desiredReplicas > existing)) {
+      return result.unstable("Waiting for all updated replicas to be scheduled");
+     }
+
+    if (!status.getCurrentRevision().equals(status.getUpdateRevision())) {
+      return result.unstable("Waiting for the updated revision to match the current revision");
     }
 
     return result;
