@@ -18,9 +18,12 @@
 package com.netflix.spinnaker.clouddriver.kubernetes.v2.description
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.google.gson.Gson
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesApiVersion
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesKind
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesManifest
+import groovy.json.JsonSlurper
+import groovy.text.SimpleTemplateEngine
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 import spock.lang.Specification
@@ -28,8 +31,8 @@ import spock.lang.Unroll
 
 class KubernetesManifestSpec extends Specification {
   def objectMapper = new ObjectMapper()
-  def yaml = new Yaml(new SafeConstructor())
 
+  def gsonObj = new Gson()
   def NAME = "my-name"
   def NAMESPACE = "my-namespace"
   def KIND = KubernetesKind.REPLICA_SET
@@ -37,27 +40,30 @@ class KubernetesManifestSpec extends Specification {
   def KEY = "hi"
   def VALUE = "there"
 
-  def BASIC_REPLICA_SET = """
-apiVersion: $API_VERSION
-kind: $KIND
-metadata:
-  name: $NAME
-  namespace: $NAMESPACE
-  generation: 1
-spec:
-  template:
-    metadata:
-      annotations:
-        $KEY: $VALUE 
-"""
+  String basicJson() {
+    def sourceJson = KubernetesManifest.class.getResource("manifest.json").getText("utf-8")
+    def templateEngine = new SimpleTemplateEngine()
+    def binding = [
+      "name": getNAME(),
+      "namespace": getNAMESPACE(),
+      "api_version": getAPI_VERSION(),
+      "key": getKEY(),
+      "value": getVALUE(),
+      "kind": getKIND()
+    ]
+    def template = templateEngine.createTemplate(sourceJson).make(binding)
+    return template.toString()
+  }
 
-  KubernetesManifest stringToManifest(String input) {
-    return objectMapper.convertValue(yaml.load(input), KubernetesManifest)
+
+  KubernetesManifest stringToManifest(Object input) {
+    return objectMapper.convertValue(input, KubernetesManifest)
   }
 
   void "correctly reads fields from basic manifest definition"() {
     when:
-    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET)
+    def testPayload =  gsonObj.fromJson(basicJson(), Object)
+    KubernetesManifest manifest = stringToManifest(testPayload)
 
     then:
     manifest.getName() == NAME
@@ -85,11 +91,17 @@ spec:
 
   void "correctly reads observedGeneration from status"() {
     when:
-    def statusYaml = """
-status:
- observedGeneration: 1
+    def statusJson = """
+{
+  "status": {
+     "observedGeneration": 1
+  }
+}
 """
-    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET + statusYaml)
+
+    def testStatusJson = gsonObj.fromJson(statusJson, Object)
+    def testPayload = gsonObj.fromJson(basicJson(), Object)
+    KubernetesManifest manifest = stringToManifest(testPayload << testStatusJson)
 
     then:
     manifest.getObservedGeneration() == 1
@@ -97,21 +109,27 @@ status:
 
   void "correctly reads generation from manifest"() {
     when:
-    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET)
+    def testPayload =  gsonObj.fromJson(basicJson(), Object)
+    KubernetesManifest manifest = stringToManifest(testPayload)
 
     then:
-    manifest.getGeneration() == 1
+    manifest.getGeneration() == 3
   }
 
   void "correctly determines isNewerThanObservedGeneration"() {
     when:
-    def statusYaml = """
-status:
- observedGeneration: 1
+    def statusJson = """
+{
+  "status": {
+     "observedGeneration": 1
+  }
+}
 """
-    KubernetesManifest manifest = stringToManifest(BASIC_REPLICA_SET + statusYaml)
 
+    def testStatusJson = gsonObj.fromJson(statusJson, Object)
+    def testPayload = gsonObj.fromJson(basicJson(), Object)
+    KubernetesManifest manifest = stringToManifest(testPayload << testStatusJson)
     then:
-    !manifest.isNewerThanObservedGeneration()
+    manifest.isNewerThanObservedGeneration()
   }
 }

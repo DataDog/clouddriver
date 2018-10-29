@@ -256,6 +256,7 @@ public class KubernetesManifest extends HashMap<String, Object> {
     if (!(statusObj instanceof Map)) {
       throw new IllegalStateException("Expected status to be a Map but was actually a " + statusObj.getClass());
     }
+
     Map<String, Object> status = (Map<String, Object>) statusObj;
 
     Object observedGenObj = status.get("observedGeneration");
@@ -289,10 +290,6 @@ public class KubernetesManifest extends HashMap<String, Object> {
   public boolean isNewerThanObservedGeneration() {
     Double generation = getGeneration();
     Double observedGeneration = getObservedGeneration();
-
-    if (observedGeneration == null || generation == null || generation < 1.0) {
-      return false;
-    }
 
     return generation > observedGeneration;
   }

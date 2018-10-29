@@ -1,17 +1,18 @@
 package com.netflix.spinnaker.clouddriver.kubernetes.v2.op.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.google.gson.Gson
+import com.netflix.spinnaker.clouddriver.kubernetes.v2.caching.agent.KubernetesCacheDataConverter
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesKind
-import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesManifest
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
+import groovy.text.SimpleTemplateEngine
+import io.kubernetes.client.models.V1beta2StatefulSet
 import spock.lang.Specification
 
 
 class KubernetesStatefulSetHandlerSpec extends Specification {
   def objectMapper = new ObjectMapper()
-  def yaml = new Yaml(new SafeConstructor())
   def handler = new KubernetesStatefulSetHandler()
+  def gsonObj = new Gson()
 
   def IMAGE = "gcr.io/project/image"
   def ACCOUNT = "my-account"
@@ -21,98 +22,82 @@ class KubernetesStatefulSetHandlerSpec extends Specification {
   def NAME = "my-name"
   def KIND = KubernetesKind.STATEFUL_SET
 
-  def statefulSetManifestWithPartition(Integer partition = CLUSTER_SIZE) {
-
-    return """
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: $NAME
-  namespace: $NAMESPACE
-  generation: 1.0
-  labels:
-    app: $NAME
-    service: $NAME
-spec:
-  serviceName: $NAME-service
-  podManagementPolicy: Parallel
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      partition: $partition
-  replicas: $CLUSTER_SIZE
-  selector:
-    matchLabels:
-      app: $NAME
-      cluster: $NAME
-  template:
-    spec:    
-      containers:
-      - name: $NAME
-        image: $IMAGE
-        imagePullPolicy: Always
-"""
+  String statefulSetManifestWithPartition(Integer partition = CLUSTER_SIZE) {
+    def sourceJson = KubernetesStatefulSetHandler.class.getResource("statefulsetpartitionbase.json").getText("utf-8")
+    def templateEngine = new SimpleTemplateEngine()
+    def binding = [
+      "partition": partition,
+      "name": getNAME(),
+      "namespace": getNAMESPACE(),
+      "replicas": getCLUSTER_SIZE(),
+      "image": getIMAGE(),
+    ]
+    def template = templateEngine.createTemplate(sourceJson).make(binding)
+    return template.toString()
   }
 
-  def statefulSetManifest = """
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: $NAME
-  namespace: $NAMESPACE
-  generation: 1.0
-  labels:
-    app: $NAME
-    service: $NAME
-spec:
-  serviceName: $NAME-service
-  podManagementPolicy: Parallel
-  updateStrategy:
-    type: RollingUpdate
-  replicas: $CLUSTER_SIZE
-  selector:
-    matchLabels:
-      app: $NAME
-      cluster: $NAME
-  template:
-    spec: 
-      containers:
-      - name: $NAME
-        image: $IMAGE
-        imagePullPolicy: Always
-"""
-
-  KubernetesManifest stringToManifest(String input) {
-    return objectMapper.convertValue(yaml.load(input), KubernetesManifest)
+  String statefulSetManifest() {
+    def sourceJson = KubernetesStatefulSetHandler.class.getResource("statefulsetbase.json").getText("utf-8")
+    def templateEngine = new SimpleTemplateEngine()
+    def binding = [
+      "name": getNAME(),
+      "namespace": getNAMESPACE(),
+      "replicas": getCLUSTER_SIZE(),
+      "image": getIMAGE(),
+    ]
+    def template = templateEngine.createTemplate(sourceJson).make(binding)
+    return template.toString()
   }
 
-  def "statefulset stable state is null if manifest.isNewerThanObservedGeneration()"() {
+  V1beta2StatefulSet stringToManifest(Object input) {
+    def manifest = KubernetesCacheDataConverter.convertToManifest(input)
+    return KubernetesCacheDataConverter.getResource(manifest, V1beta2StatefulSet.class);
+  }
+
+  def "[status] wait for stable state to be observed status is null"() {
     when:
-    def statusYaml = """
-status:
- observedGeneration: 0.0
-"""
-    def manifest = stringToManifest(statefulSetManifest + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 0,
+    "currentReplicas": 0,
+    "readyReplicas": 0,
+    "replicas": 0,
+    "updatedReplicas": 0,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifest = KubernetesCacheDataConverter.convertToManifest(baseJson << statusJson)
     def status = handler.status(manifest)
 
     then:
     status.stable == null
   }
 
-  def "wait for at least the desired replica count to be met"() {
+  def "[status] rollout status observable"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 0
- readyReplicas: 0
- replicas: 0
- updatedReplicas: 0
- currentRevision: $NAME-$VERSION
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifest + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 0,
+    "readyReplicas": 0,
+    "replicas": 0,
+    "updatedReplicas": 0,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifest = KubernetesCacheDataConverter.convertToManifest(baseJson << statusJson)
     def status = handler.status(manifest)
 
     then:
@@ -120,40 +105,91 @@ status:
     status.stable.message == "Waiting for at least the desired replica count to be met"
   }
 
-  def "wait for the updated revision to match the current revision"() {
+  def "[status] wait for stable state to be observed"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 5
- readyReplicas: 5
- replicas: 5
- updatedReplicas: 5
- currentRevision: $NAME-new-my-version
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifest + statusYaml)
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def manifest = stringToManifest(baseJson)
     def status = handler.status(manifest)
+
+    then:
+    !status.stable.state
+    status.stable.message == "No status reported yet"
+  }
+
+  def "[status] wait for at least the desired replica count to be met"() {
+    when:
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 0,
+    "readyReplicas": 0,
+    "replicas": 0,
+    "updatedReplicas": 0,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
+    def status = handler.status(manifest)
+
+    then:
+    !status.stable.state
+    status.stable.message == "Waiting for at least the desired replica count to be met"
+  }
+
+  def "[status] wait for the updated revision to match the current revision"() {
+    when:
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 5,
+    "readyReplicas": 5,
+    "replicas": 5,
+    "updatedReplicas": 5,
+    "currentRevision": "$NAME-new-my-version",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
+    def status = handler.status(manifest)
+
 
     then:
     !status.stable.state
     status.stable.message == "Waiting for the updated revision to match the current revision"
   }
 
-  def "wait for all updated replicas to be scheduled"() {
+  def "[status] wait for all updated replicas to be scheduled"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 4
- readyReplicas: 5
- replicas: 5
- currentRevision: $NAME-$VERSION
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifest + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 4,
+    "readyReplicas": 5,
+    "replicas": 5,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
     def status = handler.status(manifest)
 
     then:
@@ -161,20 +197,53 @@ status:
     status.stable.message == "Waiting for all updated replicas to be scheduled"
   }
 
-  def "wait for all updated replicas to be ready"() {
+  def "[status] rollout complete"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 5
- readyReplicas: 4
- replicas: 5
- updatedReplicas: 0
- currentRevision: $NAME-$VERSION
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifestWithPartition() + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 2,
+    "currentReplicas": 5,
+    "readyReplicas": 5,
+    "replicas": 5,
+    "updatedReplicas": 5,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifest(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
+    def status = handler.status(manifest)
+
+    then:
+    status.stable.state
+    status.stable.message == null
+  }
+
+  def "[status] wait for all updated replicas to be ready"() {
+    when:
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 5,
+    "readyReplicas": 4,
+    "replicas": 5,
+    "updatedReplicas": 0,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifestWithPartition(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
     def status = handler.status(manifest)
 
     then:
@@ -182,20 +251,26 @@ status:
     status.stable.message == "Waiting for all updated replicas to be ready"
   }
 
-  def "wait for partitioned roll out to finish"() {
+  def "[status] wait for partitioned roll out to finish"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 5
- readyReplicas: 5
- replicas: 5
- updatedReplicas: 0
- currentRevision: $NAME-$VERSION
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifestWithPartition(1) + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 5,
+    "readyReplicas": 5,
+    "replicas": 5,
+    "updatedReplicas": 0,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifestWithPartition(1), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
     def status = handler.status(manifest)
 
     then:
@@ -203,20 +278,26 @@ status:
     status.stable.message == "Waiting for partitioned roll out to finish"
   }
 
-  def "wait for updated replicas"() {
+  def "[status] wait for updated replicas"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 5
- readyReplicas: 5
- replicas: 5
- updatedReplicas: 3
- currentRevision: $NAME-$VERSION
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifestWithPartition(1) + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 5,
+    "readyReplicas": 5,
+    "replicas": 5,
+    "updatedReplicas": 3,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifestWithPartition(1), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
     def status = handler.status(manifest)
 
     then:
@@ -224,20 +305,26 @@ status:
     status.stable.message == "Waiting for partitioned roll out to finish"
   }
 
-  def "wait for partitioned roll out complete"() {
+  def "[status] wait for partitioned roll out complete"() {
     when:
-    def statusYaml = """
-status:
- availableReplicas: 0
- observedGeneration: 1.0
- currentReplicas: 5
- readyReplicas: 5
- replicas: 5
- updatedReplicas: 5
- currentRevision: $NAME-$VERSION
- updateRevision: $NAME-$VERSION
-"""
-    def manifest = stringToManifest(statefulSetManifestWithPartition(5) + statusYaml)
+    def statusJSONString = """
+{
+  "status": {
+    "availableReplicas": 0,
+    "observedGeneration": 1,
+    "currentReplicas": 5,
+    "readyReplicas": 5,
+    "replicas": 5,
+    "updatedReplicas": 5,
+    "currentRevision": "$NAME-$VERSION",
+    "updateRevision": "$NAME-$VERSION"
+  }
+}
+""".toString()
+    def baseJson = gsonObj.fromJson(statefulSetManifestWithPartition(), Object)
+    def statusJson = gsonObj.fromJson(statusJSONString, Object)
+    def manifestJson = baseJson << statusJson
+    def manifest = stringToManifest(manifestJson)
     def status = handler.status(manifest)
 
     then:
