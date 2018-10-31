@@ -22,10 +22,7 @@ import com.google.gson.Gson
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesApiVersion
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesKind
 import com.netflix.spinnaker.clouddriver.kubernetes.v2.description.manifest.KubernetesManifest
-import groovy.json.JsonSlurper
 import groovy.text.SimpleTemplateEngine
-import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.constructor.SafeConstructor
 import spock.lang.Specification
 import spock.lang.Unroll
 
