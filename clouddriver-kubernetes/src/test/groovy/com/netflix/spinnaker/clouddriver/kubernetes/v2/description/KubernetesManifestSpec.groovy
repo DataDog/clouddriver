@@ -37,7 +37,7 @@ class KubernetesManifestSpec extends Specification {
   def KEY = "hi"
   def VALUE = "there"
 
-  String basicJson() {
+  String basicManifestSource() {
     def sourceJson = KubernetesManifest.class.getResource("manifest.json").getText("utf-8")
     def templateEngine = new SimpleTemplateEngine()
     def binding = [
@@ -59,7 +59,7 @@ class KubernetesManifestSpec extends Specification {
 
   void "correctly reads fields from basic manifest definition"() {
     when:
-    def testPayload =  gsonObj.fromJson(basicJson(), Object)
+    def testPayload =  gsonObj.fromJson(basicManifestSource(), Object)
     KubernetesManifest manifest = objectToManifest(testPayload)
 
     then:
@@ -97,7 +97,7 @@ class KubernetesManifestSpec extends Specification {
 """
 
     def testStatusJson = gsonObj.fromJson(statusJson, Object)
-    def testPayload = gsonObj.fromJson(basicJson(), Object)
+    def testPayload = gsonObj.fromJson(basicManifestSource(), Object)
     KubernetesManifest manifest = objectToManifest(testPayload << testStatusJson)
 
     then:
@@ -106,7 +106,7 @@ class KubernetesManifestSpec extends Specification {
 
   void "correctly reads generation from manifest"() {
     when:
-    def testPayload =  gsonObj.fromJson(basicJson(), Object)
+    def testPayload =  gsonObj.fromJson(basicManifestSource(), Object)
     KubernetesManifest manifest = objectToManifest(testPayload)
 
     then:
@@ -124,7 +124,7 @@ class KubernetesManifestSpec extends Specification {
 """
 
     def testStatusJson = gsonObj.fromJson(statusJson, Object)
-    def testPayload = gsonObj.fromJson(basicJson(), Object)
+    def testPayload = gsonObj.fromJson(basicManifestSource(), Object)
     KubernetesManifest manifest = objectToManifest(testPayload << testStatusJson)
     then:
     manifest.isNewerThanObservedGeneration()
