@@ -53,14 +53,14 @@ class KubernetesManifestSpec extends Specification {
   }
 
 
-  KubernetesManifest stringToManifest(Object input) {
+  KubernetesManifest objectToManifest(Object input) {
     return objectMapper.convertValue(input, KubernetesManifest)
   }
 
   void "correctly reads fields from basic manifest definition"() {
     when:
     def testPayload =  gsonObj.fromJson(basicJson(), Object)
-    KubernetesManifest manifest = stringToManifest(testPayload)
+    KubernetesManifest manifest = objectToManifest(testPayload)
 
     then:
     manifest.getName() == NAME
@@ -98,7 +98,7 @@ class KubernetesManifestSpec extends Specification {
 
     def testStatusJson = gsonObj.fromJson(statusJson, Object)
     def testPayload = gsonObj.fromJson(basicJson(), Object)
-    KubernetesManifest manifest = stringToManifest(testPayload << testStatusJson)
+    KubernetesManifest manifest = objectToManifest(testPayload << testStatusJson)
 
     then:
     manifest.getObservedGeneration() == 1
@@ -107,7 +107,7 @@ class KubernetesManifestSpec extends Specification {
   void "correctly reads generation from manifest"() {
     when:
     def testPayload =  gsonObj.fromJson(basicJson(), Object)
-    KubernetesManifest manifest = stringToManifest(testPayload)
+    KubernetesManifest manifest = objectToManifest(testPayload)
 
     then:
     manifest.getGeneration() == 3
@@ -125,7 +125,7 @@ class KubernetesManifestSpec extends Specification {
 
     def testStatusJson = gsonObj.fromJson(statusJson, Object)
     def testPayload = gsonObj.fromJson(basicJson(), Object)
-    KubernetesManifest manifest = stringToManifest(testPayload << testStatusJson)
+    KubernetesManifest manifest = objectToManifest(testPayload << testStatusJson)
     then:
     manifest.isNewerThanObservedGeneration()
   }
