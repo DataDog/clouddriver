@@ -19,6 +19,8 @@ package com.netflix.spinnaker.clouddriver.kubernetes.v2.op.job;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.netflix.spinnaker.clouddriver.jobs.JobExecutor;
 import com.netflix.spinnaker.clouddriver.jobs.JobRequest;
 import com.netflix.spinnaker.clouddriver.jobs.JobStatus;
@@ -39,6 +41,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -363,16 +368,53 @@ public class KubectlJobExecutor {
       }
     }
 
+    List<KubernetesManifest> manifestList = new ArrayList<>();
+
     if (status.getStdErr().contains("No resources found")) {
-      return new ArrayList<>();
+      return manifestList;
     }
 
+    InputStream resultStream = new ByteArrayInputStream(status.getStdOut().getBytes(StandardCharsets.UTF_8));
+    JsonReader reader = new JsonReader(new InputStreamReader(resultStream, StandardCharsets.UTF_8));
+
+    // Payloads from these calls are shaped like so:
+    // { "apiVersion": "...", "items": [ { KubernetesManifest }, { KubernetesManifest } ] }
     try {
-      KubernetesManifestList list = gson.fromJson(status.getStdOut(), KubernetesManifestList.class);
-      return list.getItems();
-    } catch (JsonSyntaxException e) {
-      throw new KubectlException("Failed to parse kubectl output: " + e.getMessage(), e);
+      while (reader.hasNext()) {
+        JsonToken token = reader.peek();
+        switch(token) {
+          case BEGIN_OBJECT:
+            reader.beginObject();
+            break;
+          case STRING:
+            reader.nextString();
+            break;
+          case NAME:
+            reader.nextName();
+            break;
+          case BEGIN_ARRAY:
+            reader.beginArray();
+            while (reader.hasNext()) {
+              KubernetesManifest manifest = gson.fromJson(reader, KubernetesManifest.class);
+              manifestList.add(manifest);
+            }
+            break;
+          case END_ARRAY:
+            reader.endArray();
+            break;
+          case END_OBJECT:
+            reader.endObject();
+            break;
+          default:
+            break;
+        }
+      }
+      reader.close();
+    } catch (java.io.IOException e) {
+      throw new KubectlOutputSerializationException("Could not serialize kubectl output: " + e.getMessage(), e);
     }
+
+    return manifestList;
   }
 
   public Void deploy(KubernetesV2Credentials credentials, KubernetesManifest manifest) {
@@ -669,6 +711,12 @@ public class KubectlJobExecutor {
     }
 
     public KubectlException(String message, Throwable cause) {
+      super(message, cause);
+    }
+  }
+
+  public static class KubectlOutputSerializationException extends RuntimeException {
+    public KubectlOutputSerializationException(String message, Throwable cause) {
       super(message, cause);
     }
   }
