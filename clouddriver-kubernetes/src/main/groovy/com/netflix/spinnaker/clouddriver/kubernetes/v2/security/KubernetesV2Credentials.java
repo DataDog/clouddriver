@@ -76,6 +76,10 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
   @Getter
   private final List<CustomKubernetesResource> customResources;
 
+  // TODO(lwander) make configurable
+  private final static int crdExpirySeconds = 30;
+  private final com.google.common.base.Supplier<List<KubernetesKind>> liveCrdSupplier;
+
   // remove when kubectl is no longer a dependency
   @Getter
   private final String kubectlExecutable;
@@ -359,6 +363,28 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
     if (checkPermissionsOnStartup) {
       determineOmitKinds();
     }
+
+    this.liveCrdSupplier = Suppliers.memoizeWithExpiration(() -> {
+      try {
+        return this.list(KubernetesKind.CUSTOM_RESOURCE_DEFINITION, "")
+          .stream()
+          .map(c -> {
+            Map<String, Object> spec = (Map) c.getOrDefault("spec", new HashMap<>());
+            String scope = (String) spec.getOrDefault("scope", "");
+            Map<String, String> names = (Map) spec.getOrDefault("names", new HashMap<>());
+            String name = names.get("kind");
+            return KubernetesKind.fromString(name, false, scope.equalsIgnoreCase("namespaced"));
+          })
+          .collect(Collectors.toList());
+      } catch (KubectlException e) {
+        // not logging here -- it will generate a lot of noise in cases where crds aren't available/registered in the first place
+        return new ArrayList<>();
+      }
+    }, crdExpirySeconds, TimeUnit.SECONDS);
+  }
+
+  public List<KubernetesKind> getCrds() {
+    return liveCrdSupplier.get();
   }
 
   @Override
