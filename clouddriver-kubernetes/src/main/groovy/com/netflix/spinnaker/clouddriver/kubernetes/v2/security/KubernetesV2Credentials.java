@@ -93,6 +93,9 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
   @Getter
   private final Integer kubectlRequestTimeoutSeconds;
 
+  @Getter
+  private final Integer kubectlGetChunkSize;
+
   // remove when kubectl is no longer a dependency
   @Getter
   private final String kubeconfigFile;
@@ -178,6 +181,7 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
     String context;
     String kubectlExecutable;
     Integer kubectlRequestTimeoutSeconds;
+    Integer kubectlGetChunkSize;
     String oAuthServiceAccount;
     List<String> oAuthScopes;
     String userAgent;
@@ -212,6 +216,11 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
 
     public Builder kubectlRequestTimeoutSeconds(Integer kubectlRequestTimeoutSeconds) {
       this.kubectlRequestTimeoutSeconds = kubectlRequestTimeoutSeconds;
+      return this;
+    }
+
+    public Builder kubectlGetChunkSize(Integer kubectlGetChunkSize) {
+      this.kubectlGetChunkSize = kubectlGetChunkSize;
       return this;
     }
 
@@ -317,6 +326,7 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
           kubeconfigFile,
           kubectlExecutable,
           kubectlRequestTimeoutSeconds,
+          kubectlGetChunkSize,
           context,
           oAuthServiceAccount,
           oAuthScopes,
@@ -341,6 +351,7 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
       String kubeconfigFile,
       String kubectlExecutable,
       Integer kubectlRequestTimeoutSeconds,
+      Integer kubectlGetChunkSize,
       String context,
       String oAuthServiceAccount,
       List<String> oAuthScopes,
@@ -362,6 +373,7 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
     this.debug = debug;
     this.kubectlExecutable = kubectlExecutable;
     this.kubectlRequestTimeoutSeconds = kubectlRequestTimeoutSeconds;
+    this.kubectlGetChunkSize = kubectlGetChunkSize;
     this.kubeconfigFile = kubeconfigFile;
     this.context = context;
     this.oAuthServiceAccount = oAuthServiceAccount;

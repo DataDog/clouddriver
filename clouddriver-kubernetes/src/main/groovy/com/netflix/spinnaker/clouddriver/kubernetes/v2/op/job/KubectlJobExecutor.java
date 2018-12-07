@@ -509,6 +509,10 @@ public class KubectlJobExecutor {
     command.add("-o");
     command.add("json");
 
+    if (credentials.getKubectlGetChunkSize() != null) {
+     command.add("--chunk-size=" + credentials.getKubectlGetChunkSize());
+    }
+
     command.add("get");
     command.add(String.join(",", kind.stream().map(KubernetesKind::toString).collect(Collectors.toList())));
 
