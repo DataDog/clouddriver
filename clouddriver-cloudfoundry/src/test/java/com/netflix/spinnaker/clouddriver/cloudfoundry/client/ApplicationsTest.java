@@ -28,6 +28,9 @@ import com.netflix.spinnaker.clouddriver.cloudfoundry.model.CloudFoundryServerGr
 import com.netflix.spinnaker.clouddriver.cloudfoundry.model.CloudFoundrySpace;
 import io.vavr.collection.HashMap;
 import org.junit.jupiter.api.Test;
+import retrofit.RetrofitError;
+import retrofit.client.Response;
+import retrofit.mime.TypedInput;
 
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -42,11 +45,11 @@ import static org.mockito.Mockito.*;
 class ApplicationsTest {
   private ApplicationService applicationService = mock(ApplicationService.class);
   private Spaces spaces = mock(Spaces.class);
-  private Applications apps = new Applications("pws", applicationService, spaces);
+  private Applications apps = new Applications("pws", "some-apps-man-uri", applicationService, spaces);
 
   @Test
   void errorHandling() {
-    CloudFoundryClient client = new HttpCloudFoundryClient("pws", "api.run.pivotal.io",
+    CloudFoundryClient client = new HttpCloudFoundryClient("pws", "some.api.uri.example.com", "api.run.pivotal.io",
       "baduser", "badpassword");
 
     assertThatThrownBy(() -> client.getApplications().all())
@@ -123,7 +126,45 @@ class ApplicationsTest {
     assertThat(cloudFoundryServerGroup).isNotNull();
     assertThat(cloudFoundryServerGroup.getId()).isEqualTo("some-app-guid");
     assertThat(cloudFoundryServerGroup.getName()).isEqualTo("some-app-name");
+    assertThat(cloudFoundryServerGroup.getAppsManagerUri()).isEqualTo("some-apps-man-uri/organizations/org-id/spaces/space-id/applications/some-app-guid");
     assertThat(cloudFoundryServerGroup.getServiceInstances().size()).isEqualTo(1);
     assertThat(cloudFoundryServerGroup.getServiceInstances().get(0).getTags()).containsExactly("tag1", "tag2");
+  }
+
+  @Test
+  void updateProcess() {
+    when(applicationService.updateProcess(any(), any())).thenReturn(new Process());
+
+    apps.updateProcess("guid1", "command1", "http", "/endpoint");
+    verify(applicationService).updateProcess("guid1", new UpdateProcess("command1",
+      new Process.HealthCheck().setType("http").setData(
+        new Process.HealthCheckData().setEndpoint("/endpoint")
+      )
+    ));
+
+    apps.updateProcess("guid1", "command1", "http", null);
+    verify(applicationService).updateProcess("guid1", new UpdateProcess("command1",
+      new Process.HealthCheck().setType("http")
+    ));
+
+    apps.updateProcess("guid1", "command1", null, null);
+    verify(applicationService).updateProcess("guid1", new UpdateProcess("command1", null));
+  }
+
+  @Test
+  void getProcessState(){
+    ProcessStats processStats = new ProcessStats().setState(ProcessStats.State.RUNNING);
+    ProcessResources processResources = new ProcessResources().setResources(Collections.singletonList(processStats));
+    when(applicationService.findProcessStatsById(anyString())).thenReturn(processResources);
+    ProcessStats.State result = apps.getProcessState("some-app-guid");
+    assertThat(result).isEqualTo(ProcessStats.State.RUNNING);
+  }
+
+  @Test
+  void getProcessStateWhenStatsNotFound(){
+    Response errorResponse = new Response("http://capi.io", 404,"Not Found", Collections.EMPTY_LIST, null);
+    when(applicationService.findProcessStatsById(anyString())).thenThrow(RetrofitError.httpError("http://capi.io", errorResponse, null, null));
+    ProcessStats.State result = apps.getProcessState("some-app-guid");
+    assertThat(result).isEqualTo(ProcessStats.State.DOWN);
   }
 }
