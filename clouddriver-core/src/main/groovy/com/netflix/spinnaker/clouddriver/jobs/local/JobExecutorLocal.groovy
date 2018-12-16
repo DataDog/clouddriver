@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.jobs.local
 
+import com.netflix.spinnaker.clouddriver.jobs.ByteArrayInputOutputStream
 import com.netflix.spinnaker.clouddriver.jobs.JobExecutor
 import com.netflix.spinnaker.clouddriver.jobs.JobRequest
 import com.netflix.spinnaker.clouddriver.jobs.JobStatus
@@ -45,8 +46,8 @@ class JobExecutorLocal implements JobExecutor {
 
     String jobId = UUID.randomUUID().toString()
 
-    ByteArrayOutputStream stdOut = new ByteArrayOutputStream()
-    ByteArrayOutputStream stdErr = new ByteArrayOutputStream()
+    ByteArrayInputOutputStream stdOut = new ByteArrayInputOutputStream()
+    ByteArrayInputOutputStream stdErr = new ByteArrayInputOutputStream()
     PumpStreamHandler pumpStreamHandler = new PumpStreamHandler(stdOut, stdErr, inputStream)
     CommandLine commandLine
 
@@ -111,17 +112,14 @@ class JobExecutorLocal implements JobExecutor {
         JobStatus jobStatus = new JobStatus(id: jobId)
 
         DefaultExecuteResultHandler resultHandler
-        ByteArrayOutputStream stdOut
-        ByteArrayOutputStream stdErr
+        ByteArrayInputOutputStream stdOut
+        ByteArrayInputOutputStream stdErr
 
         jobIdToHandlerMap[jobId].with {
           resultHandler = it.handler
           stdOut = it.stdOut
           stdErr = it.stdErr
         }
-
-        String output = new String(stdOut.toByteArray())
-        String errors = new String(stdErr.toByteArray())
 
         if (resultHandler.hasResult()) {
           log.debug("State for $jobId changed with exit code $resultHandler.exitValue.")
@@ -142,8 +140,8 @@ class JobExecutorLocal implements JobExecutor {
         } else {
           jobStatus.state = JobStatus.State.RUNNING
         }
-        jobStatus.stdOut = output
-        jobStatus.stdErr = errors
+        jobStatus.stdOut = stdOut
+        jobStatus.stdErr = stdErr
         return jobStatus
       } else {
         // This instance is not managing the job, it has timed out, or it was cancelled.

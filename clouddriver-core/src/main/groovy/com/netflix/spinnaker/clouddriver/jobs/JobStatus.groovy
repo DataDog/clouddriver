@@ -21,8 +21,8 @@ class JobStatus {
   String id
   State state
   Result result
-  String stdOut
-  String stdErr
+  ByteArrayInputOutputStream stdOut
+  ByteArrayInputOutputStream stdErr
 
   static enum State {
     RUNNING, COMPLETED
