@@ -124,8 +124,8 @@ class JobExecutorLocal implements JobExecutor {
         if (resultHandler.hasResult()) {
           log.debug("State for $jobId changed with exit code $resultHandler.exitValue.")
 
-          if (!output) {
-            output = resultHandler.exception ? resultHandler.exception.message : "No output from command."
+          if (stdOut.size() == 0) {
+            resultHandler.exception ? stdOut.write(resultHandler.exception.message.bytes) : stdOut.write("No output from command.".bytes)
           }
 
           if (resultHandler.exitValue == 0) {
