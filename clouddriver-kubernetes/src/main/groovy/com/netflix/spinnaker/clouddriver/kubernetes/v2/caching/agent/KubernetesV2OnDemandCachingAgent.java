@@ -264,6 +264,7 @@ public abstract class KubernetesV2OnDemandCachingAgent extends KubernetesV2Cachi
 
     // No on-demand updates needed when live calls are used to check for status during orchestration
     if (credentials.isLiveManifestCalls()) {
+      log.info("Skipping on demand cache refresh, live mode enabled.");
       return null;
     }
 
