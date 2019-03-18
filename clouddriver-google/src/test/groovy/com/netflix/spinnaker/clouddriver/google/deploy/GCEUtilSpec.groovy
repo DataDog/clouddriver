@@ -24,7 +24,16 @@ import com.google.api.client.http.HttpRequestFactory
 import com.google.api.client.http.HttpResponse
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.compute.Compute
-import com.google.api.services.compute.model.*
+import com.google.api.services.compute.model.BackendService
+import com.google.api.services.compute.model.ForwardingRuleList
+import com.google.api.services.compute.model.Image
+import com.google.api.services.compute.model.ImageList
+import com.google.api.services.compute.model.Instance
+import com.google.api.services.compute.model.InstanceAggregatedList
+import com.google.api.services.compute.model.InstanceTemplate
+import com.google.api.services.compute.model.InstancesScopedList
+import com.google.api.services.compute.model.Metadata
+import com.google.api.services.compute.model.ServiceAccount
 import com.netflix.spectator.api.DefaultRegistry
 import com.netflix.spectator.api.Registry
 import com.netflix.spinnaker.clouddriver.data.task.Task
@@ -39,7 +48,7 @@ import com.netflix.spinnaker.clouddriver.google.model.loadbalancing.GoogleHttpLo
 import com.netflix.spinnaker.clouddriver.google.model.loadbalancing.GoogleNetworkLoadBalancer
 import com.netflix.spinnaker.clouddriver.google.provider.view.GoogleLoadBalancerProvider
 import com.netflix.spinnaker.clouddriver.google.security.GoogleNamedAccountCredentials
-import com.netflix.spinnaker.clouddriver.googlecommon.batch.GoogleBatchRequest
+import com.netflix.spinnaker.clouddriver.google.batch.GoogleBatchRequest
 import com.netflix.spinnaker.kork.artifacts.model.Artifact
 import spock.lang.Shared
 import spock.lang.Specification
@@ -57,8 +66,8 @@ class GCEUtilSpec extends Specification {
   private static final PHASE = "SOME-PHASE"
   private static final INSTANCE_LOCAL_NAME_1 = "some-instance-name-1"
   private static final INSTANCE_LOCAL_NAME_2 = "some-instance-name-2"
-  private static final INSTANCE_URL_1 = "https://www.googleapis.com/compute/v1/projects/$PROJECT_NAME/zones/us-central1-b/instances/$INSTANCE_LOCAL_NAME_1"
-  private static final INSTANCE_URL_2 = "https://www.googleapis.com/compute/v1/projects/$PROJECT_NAME/zones/us-central1-b/instances/$INSTANCE_LOCAL_NAME_2"
+  private static final INSTANCE_URL_1 = "https://compute.googleapis.com/compute/v1/projects/$PROJECT_NAME/zones/us-central1-b/instances/$INSTANCE_LOCAL_NAME_1"
+  private static final INSTANCE_URL_2 = "https://compute.googleapis.com/compute/v1/projects/$PROJECT_NAME/zones/us-central1-b/instances/$INSTANCE_LOCAL_NAME_2"
   private static final IMAGE_PROJECT_NAME = "some-image-project"
   private static final GOOGLE_APPLICATION_NAME = "test"
   private static final BASE_IMAGE_PROJECTS = ["centos-cloud", "ubuntu-os-cloud"]
@@ -94,7 +103,7 @@ class GCEUtilSpec extends Specification {
         httpTransport, jsonFactory, httpRequestInitializer).setApplicationName(GOOGLE_APPLICATION_NAME).build()
       def soughtImage = new Image(name: IMAGE_NAME)
       def imageList = new ImageList(
-        selfLink: "https://www.googleapis.com/compute/alpha/projects/$PROJECT_NAME/global/images",
+        selfLink: "https://compute.googleapis.com/compute/alpha/projects/$PROJECT_NAME/global/images",
         items: [soughtImage]
       )
 
@@ -127,7 +136,7 @@ class GCEUtilSpec extends Specification {
       def credentials = new GoogleNamedAccountCredentials.Builder().compute(compute).imageProjects([IMAGE_PROJECT_NAME]).build()
       def soughtImage = new Image(name: IMAGE_NAME)
       def imageList = new ImageList(
-        selfLink: "https://www.googleapis.com/compute/alpha/projects/$PROJECT_NAME/global/images",
+        selfLink: "https://compute.googleapis.com/compute/alpha/projects/$PROJECT_NAME/global/images",
         items: [soughtImage]
       )
 
@@ -206,7 +215,7 @@ class GCEUtilSpec extends Specification {
     def soughtImage = new Image(name: IMAGE_NAME)
     def artifact = Artifact.builder()
       .name(IMAGE_NAME)
-      .reference("https://www.googleapis.com/compute/v1/projects/$PROJECT_NAME/global/images/$IMAGE_NAME")
+      .reference("https://compute.googleapis.com/compute/v1/projects/$PROJECT_NAME/global/images/$IMAGE_NAME")
       .type("gce/image")
       .build()
 
@@ -522,18 +531,18 @@ class GCEUtilSpec extends Specification {
           regional: isRegional,
           zone: ZONE,
           asg: [
-            (GoogleServerGroup.View.GLOBAL_LOAD_BALANCER_NAMES): loadBalancerNameList,
+            (GCEUtil.GLOBAL_LOAD_BALANCER_NAMES): loadBalancerNameList,
           ],
           launchConfig: [
             instanceTemplate: new InstanceTemplate(name: "irrelevant-instance-template-name",
               properties: [
                 'metadata': new Metadata(items: [
                   new Metadata.Items(
-                    key: (GoogleServerGroup.View.LOAD_BALANCING_POLICY),
+                    key: (GCEUtil.LOAD_BALANCING_POLICY),
                     value: "{\"balancingMode\": \"UTILIZATION\",\"maxUtilization\": 0.80, \"namedPorts\": [{\"name\": \"http\", \"port\": 8080}], \"capacityScaler\": 0.77}"
                   ),
                   new Metadata.Items(
-                    key: (GoogleServerGroup.View.BACKEND_SERVICE_NAMES),
+                    key: (GCEUtil.BACKEND_SERVICE_NAMES),
                     value: backendServiceNames
                   )
                 ])
@@ -556,7 +565,7 @@ class GCEUtilSpec extends Specification {
       if (lbNames) {
         serverGroup.launchConfig.instanceTemplate.properties.metadata.items.add(
           new Metadata.Items(
-            key: (GoogleServerGroup.View.GLOBAL_LOAD_BALANCER_NAMES),
+            key: (GCEUtil.GLOBAL_LOAD_BALANCER_NAMES),
             value: lbNames.join(",").trim()
           )
         )
@@ -598,8 +607,8 @@ class GCEUtilSpec extends Specification {
 
     where:
       fullResourceLink << [
-        "https://www.googleapis.com/compute/v1/projects/my-test-project/global/firewalls/name-a",
-        "www.googleapis.com/compute/v1/projects/my-test-project/global/firewalls/name-a",
+        "https://compute.googleapis.com/compute/v1/projects/my-test-project/global/firewalls/name-a",
+        "compute.googleapis.com/compute/v1/projects/my-test-project/global/firewalls/name-a",
         "compute/v1/projects/my-test-project/global/firewalls/name-a",
         "projects/my-test-project/global/firewalls/name-a"
       ]
@@ -617,7 +626,7 @@ class GCEUtilSpec extends Specification {
       fullResourceLink << [
         null,
         "",
-        "https://www.googleapis.com/compute/v1/my-test-project/global/firewalls/name-a"
+        "https://compute.googleapis.com/compute/v1/my-test-project/global/firewalls/name-a"
       ]
   }
 }

@@ -222,12 +222,14 @@ public class ProjectClustersService {
     public String stack;
     public String detail;
     public List<ApplicationClusterModel> applications;
+    public ServerGroup.InstanceCounts instanceCounts;
 
     public ClusterModel(String account, String stack, String detail, List<ApplicationClusterModel> applications) {
       this.account = account;
       this.stack = stack;
       this.detail = detail;
       this.applications = applications;
+      this.instanceCounts = getInstanceCounts();
     }
 
     ServerGroup.InstanceCounts getInstanceCounts() {
@@ -253,7 +255,7 @@ public class ProjectClustersService {
         .flatMap(ac -> ac.getServerGroups().stream())
         .filter(serverGroup ->
           serverGroup != null &&
-            !serverGroup.isDisabled() &&
+            (serverGroup.isDisabled() == null || !serverGroup.isDisabled()) &&
             serverGroup.getInstanceCounts().getTotal() > 0)
         .forEach((ServerGroup serverGroup) -> {
           RegionClusterModel regionCluster = regionClusters.computeIfAbsent(
@@ -262,7 +264,9 @@ public class ProjectClustersService {
           );
           incrementInstanceCounts(serverGroup, regionCluster.instanceCounts);
 
-          JenkinsBuildInfo buildInfo = extractJenkinsBuildInfo(serverGroup.getImagesSummary().getSummaries());
+          ServerGroup.ImagesSummary imagesSummary = serverGroup.getImagesSummary();
+          List<? extends ServerGroup.ImageSummary> imageSummaries = imagesSummary == null ? new ArrayList() : imagesSummary.getSummaries();
+          JenkinsBuildInfo buildInfo = extractJenkinsBuildInfo(imageSummaries);
           Optional<DeployedBuild> existingBuild = regionCluster.builds.stream()
             .filter(b -> b.buildNumber.equals(buildInfo.number) &&
               Optional.ofNullable(b.host).equals(Optional.ofNullable(buildInfo.host)) &&
@@ -270,13 +274,23 @@ public class ProjectClustersService {
             .findFirst();
 
           new OptionalConsumer<>(
-            (DeployedBuild b) -> b.deployed = Math.max(b.deployed, serverGroup.getCreatedTime()),
+            (DeployedBuild b) -> {
+              b.deployed = Math.max(b.deployed, serverGroup.getCreatedTime());
+              List images = getServerGroupBuildInfoImages(imageSummaries);
+              if (images != null) {
+                images.forEach(image -> {
+                  if (image != null && !b.images.contains(image)) {
+                    b.images.add(image);
+                  }
+                });
+              }
+            },
             () -> regionCluster.builds.add(new DeployedBuild(
               buildInfo.host,
               buildInfo.name,
               buildInfo.number,
               serverGroup.getCreatedTime(),
-              getServerGroupBuildInfoImages(serverGroup.getImagesSummary().getSummaries())
+              getServerGroupBuildInfoImages(imageSummaries)
             ))
           ).accept(existingBuild);
         });

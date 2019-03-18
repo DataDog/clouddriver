@@ -31,6 +31,8 @@ public class LastOperation {
   public enum Type {
     CREATE("create"),
     DELETE("delete"),
+    SHARE("share"),
+    UNSHARE("unshare"),
     UPDATE("update");
 
     private final String type;
@@ -42,13 +44,14 @@ public class LastOperation {
     @Nullable
     @JsonCreator
     public static Type fromType(String type) {
-      return stream(Type.values()).filter(st -> st.type.equals(type)).findFirst().orElse(null);
+      return stream(Type.values()).filter(st -> st.type.equalsIgnoreCase(type)).findFirst().orElse(null);
     }
   }
 
   public enum State {
     FAILED("failed"),
     IN_PROGRESS("in progress"),
+    NOT_FOUND("not found"),
     SUCCEEDED("succeeded");
 
     private final String state;
@@ -60,7 +63,7 @@ public class LastOperation {
     @Nullable
     @JsonCreator
     public static State fromState(String state) {
-      return stream(State.values()).filter(st -> st.state.equals(state)).findFirst().orElse(null);
+      return stream(State.values()).filter(st -> st.state.equalsIgnoreCase(state)).findFirst().orElse(null);
     }
   }
 }

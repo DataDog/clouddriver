@@ -46,8 +46,9 @@ public class KubernetesUnregisteredCustomResourceCachingAgent extends Kubernetes
       ObjectMapper objectMapper,
       Registry registry,
       int agentIndex,
-      int agentCount) {
-    super(namedAccountCredentials, propertyRegistry, objectMapper, registry, agentIndex, agentCount);
+      int agentCount,
+      Long agentInterval) {
+    super(namedAccountCredentials, propertyRegistry, objectMapper, registry, agentIndex, agentCount, agentInterval);
 
   }
 
@@ -62,6 +63,8 @@ public class KubernetesUnregisteredCustomResourceCachingAgent extends Kubernetes
 
   @Override
   protected List<KubernetesKind> primaryKinds() {
-    return credentials.getCrds();
+    return credentials.getCrds().stream()
+      .filter(credentials::isValidKind)
+      .collect(Collectors.toList());
   }
 }

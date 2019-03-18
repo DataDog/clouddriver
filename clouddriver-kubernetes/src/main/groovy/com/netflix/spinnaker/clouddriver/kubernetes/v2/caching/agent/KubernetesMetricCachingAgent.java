@@ -19,6 +19,7 @@ package com.netflix.spinnaker.clouddriver.kubernetes.v2.caching.agent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.netflix.spectator.api.Registry;
 import com.netflix.spinnaker.cats.agent.AgentDataType;
+import com.netflix.spinnaker.cats.agent.AgentIntervalAware;
 import com.netflix.spinnaker.cats.agent.CacheResult;
 import com.netflix.spinnaker.cats.agent.DefaultCacheResult;
 import com.netflix.spinnaker.cats.cache.CacheData;
@@ -42,9 +43,12 @@ import static com.netflix.spinnaker.cats.agent.AgentDataType.Authority.AUTHORITA
 import static com.netflix.spinnaker.clouddriver.kubernetes.v2.caching.Keys.Kind.KUBERNETES_METRIC;
 
 @Slf4j
-public class KubernetesMetricCachingAgent extends KubernetesCachingAgent<KubernetesV2Credentials> {
+public class KubernetesMetricCachingAgent extends KubernetesCachingAgent<KubernetesV2Credentials> implements AgentIntervalAware {
   @Getter
   protected String providerName = KubernetesCloudProvider.getID();
+
+  @Getter
+  private final Long agentInterval;
 
   @Getter
   protected Collection<AgentDataType> providedDataTypes = Collections.unmodifiableCollection(
@@ -55,13 +59,15 @@ public class KubernetesMetricCachingAgent extends KubernetesCachingAgent<Kuberne
       ObjectMapper objectMapper,
       Registry registry,
       int agentIndex,
-      int agentCount) {
+      int agentCount,
+      Long agentInterval) {
     super(namedAccountCredentials, objectMapper, registry, agentIndex, agentCount);
+    this.agentInterval = agentInterval;
   }
 
   @Override
   public CacheResult loadData(ProviderCache providerCache) {
-    log.info(getAgentType() + " is starting");
+    log.info(getAgentType() + ": agent is starting");
     reloadNamespaces();
 
     List<CacheData> cacheData = namespaces.parallelStream()
@@ -72,7 +78,7 @@ public class KubernetesMetricCachingAgent extends KubernetesCachingAgent<Kuberne
                     .map(m -> KubernetesCacheDataConverter.convertPodMetric(accountName, n, m));
               } catch (KubectlJobExecutor.KubectlException e) {
                 if (e.getMessage().contains("not available")) {
-                  log.warn("Metrics for namespace '" + n + "' in account '" + accountName + "' have not been recorded yet.");
+                  log.warn("{}: Metrics for namespace '" + n + "' in account '" + accountName + "' have not been recorded yet.", getAgentType());
                   return null;
                 } else {
                   throw e;

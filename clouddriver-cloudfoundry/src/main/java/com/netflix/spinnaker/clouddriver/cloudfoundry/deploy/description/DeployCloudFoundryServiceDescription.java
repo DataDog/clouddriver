@@ -18,19 +18,19 @@ package com.netflix.spinnaker.clouddriver.cloudfoundry.deploy.description;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.netflix.spinnaker.clouddriver.artifacts.config.ArtifactCredentials;
-import com.netflix.spinnaker.clouddriver.cloudfoundry.model.CloudFoundrySpace;
 import com.netflix.spinnaker.kork.artifacts.model.Artifact;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import javax.annotation.Nullable;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DeployCloudFoundryServiceDescription extends AbstractCloudFoundryServiceDescription {
+  private boolean userProvided = false;
+
   @JsonIgnore
   private Artifact artifact;
 
@@ -40,16 +40,38 @@ public class DeployCloudFoundryServiceDescription extends AbstractCloudFoundrySe
   @JsonIgnore
   private ServiceAttributes serviceAttributes;
 
+  @JsonIgnore
+  private UserProvidedServiceAttributes userProvidedServiceAttributes;
+
   @Data
   public static class ServiceAttributes {
     String service;
-    String serviceName;
+    String serviceInstanceName;
     String servicePlan;
+    boolean updatable = true;
 
     @Nullable
     Set<String> tags;
 
     @Nullable
     Map<String, Object> parameterMap;
+  }
+
+  @Data
+  public static class UserProvidedServiceAttributes {
+    String serviceInstanceName;
+    boolean updatable = true;
+
+    @Nullable
+    Set<String> tags;
+
+    @Nullable
+    String syslogDrainUrl;
+
+    @Nullable
+    Map<String, Object> credentials;
+
+    @Nullable
+    String routeServiceUrl;
   }
 }

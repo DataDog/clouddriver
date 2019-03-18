@@ -16,6 +16,7 @@
 
 package com.netflix.spinnaker.clouddriver.titus.deploy.handlers
 
+import com.netflix.frigga.Names
 import com.netflix.spinnaker.clouddriver.aws.deploy.ops.loadbalancer.TargetGroupLookupHelper
 import com.netflix.spinnaker.clouddriver.aws.deploy.ops.loadbalancer.TargetGroupLookupHelper.TargetGroupLookupResult
 import com.netflix.spinnaker.clouddriver.aws.services.RegionScopedProviderFactory
@@ -113,6 +114,13 @@ class TitusDeployHandler implements DeployHandler<TitusDeployDescription> {
 
       if (description.source.asgName) {
         task.updateStatus BASE_PHASE, "Getting Source ASG Name Details... ${System.currentTimeMillis()}"
+
+
+        // If cluster name info was not provided, use the fields from the source asg
+        def sourceName = Names.parseName(description.source.asgName)
+        description.application = description.application != null ? description.application : sourceName.app
+        description.stack = description.stack != null ? description.stack : sourceName.stack
+        description.freeFormDetails = description.freeFormDetails != null ? description.freeFormDetails : sourceName.detail
 
         Source source = description.source
 
@@ -240,6 +248,7 @@ class TitusDeployHandler implements DeployHandler<TitusDeployDescription> {
         .withMigrationPolicy(description.migrationPolicy)
         .withCredentials(description.credentials.name)
         .withContainerAttributes(description.containerAttributes.collectEntries { [(it.key): it.value?.toString()] })
+        .withDisruptionBudget(description.disruptionBudget)
 
       if (dockerImage.imageDigest != null) {
         submitJobRequest = submitJobRequest.withDockerDigest(dockerImage.imageDigest)
@@ -352,13 +361,16 @@ class TitusDeployHandler implements DeployHandler<TitusDeployDescription> {
             task.updateStatus BASE_PHASE, "Retrying with ${nextServerGroupName} after ${retryCount} attempts ${System.currentTimeMillis()}"
             throw e
           }
-          if (e.status.code == Status.UNAVAILABLE.code || e.status.code == Status.DEADLINE_EXCEEDED.code) {
+          if (e.status.code == Status.UNAVAILABLE.code ||
+              e.status.code == Status.INTERNAL.code ||
+              e.status.code == Status.DEADLINE_EXCEEDED.code) {
             retryCount++
             task.updateStatus BASE_PHASE, "Retrying after ${retryCount} attempts ${System.currentTimeMillis()}"
-            throw e;
+            throw e
           } else {
             log.error("Could not submit job and not retrying for status ${e.status} ", e)
             task.updateStatus BASE_PHASE, "could not submit job ${e.status} ${e.message} ${System.currentTimeMillis()}"
+            throw e
           }
         }
       }, 8, 100, true)

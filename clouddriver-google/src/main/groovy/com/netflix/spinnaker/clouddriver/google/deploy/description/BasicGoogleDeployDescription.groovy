@@ -16,10 +16,12 @@
 
 package com.netflix.spinnaker.clouddriver.google.deploy.description
 
+import com.google.api.services.compute.model.AcceleratorConfig
+import com.netflix.frigga.NameBuilder
 import com.netflix.frigga.Names
 import com.netflix.spinnaker.clouddriver.deploy.DeployDescription
-import com.netflix.spinnaker.clouddriver.google.model.GoogleAutoscalingPolicy
 import com.netflix.spinnaker.clouddriver.google.model.GoogleAutoHealingPolicy
+import com.netflix.spinnaker.clouddriver.google.model.GoogleAutoscalingPolicy
 import com.netflix.spinnaker.clouddriver.google.model.GoogleDistributionPolicy
 import com.netflix.spinnaker.clouddriver.google.model.loadbalancing.GoogleHttpLoadBalancingPolicy
 import com.netflix.spinnaker.clouddriver.security.resources.ApplicationNameable
@@ -48,6 +50,7 @@ class BasicGoogleDeployDescription extends BaseGoogleInstanceDescription impleme
   GoogleAutoscalingPolicy autoscalingPolicy
   GoogleHttpLoadBalancingPolicy loadBalancingPolicy
   GoogleAutoHealingPolicy autoHealingPolicy
+  Boolean overwriteAncestorAutoHealingPolicy = false
   /**
    * Optional explicit specification of zones for an RMIG.
    */
@@ -58,6 +61,18 @@ class BasicGoogleDeployDescription extends BaseGoogleInstanceDescription impleme
   Capacity capacity
   Source source = new Source()
   String userData
+  List<AcceleratorConfig> acceleratorConfigs
+
+  @Override
+  String getName() {
+    def nameBuilder = new NameBuilder() {
+      @Override
+      protected String combineAppStackDetail(String appName, String stack, String detail) {
+        return super.combineAppStackDetail(appName, stack, detail)
+      }
+    }
+    nameBuilder.combineAppStackDetail(application, stack, freeFormDetails)
+  }
 
   @Canonical
   @ToString(includeNames = true)

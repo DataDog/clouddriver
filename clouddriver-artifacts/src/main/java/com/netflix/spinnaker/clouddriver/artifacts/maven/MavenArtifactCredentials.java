@@ -21,7 +21,7 @@ import com.netflix.spinnaker.clouddriver.artifacts.ivy.IvyArtifactCredentials;
 import com.netflix.spinnaker.clouddriver.artifacts.ivy.settings.IBiblioResolver;
 import com.netflix.spinnaker.clouddriver.artifacts.ivy.settings.IvySettings;
 import com.netflix.spinnaker.clouddriver.artifacts.ivy.settings.Resolvers;
-import lombok.Data;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Path;
@@ -30,15 +30,15 @@ import java.util.List;
 import java.util.function.Supplier;
 
 @Slf4j
-@Data
-public class MavenArtifactCredentials extends IvyArtifactCredentials {
+class MavenArtifactCredentials extends IvyArtifactCredentials {
+  @Getter
   private final List<String> types = Collections.singletonList("maven/file");
 
-  public MavenArtifactCredentials(MavenArtifactAccount account) {
+  MavenArtifactCredentials(MavenArtifactAccount account) {
     super(toIvyAccount(account));
   }
 
-  public MavenArtifactCredentials(MavenArtifactAccount account, Supplier<Path> cacheBuilder) {
+  MavenArtifactCredentials(MavenArtifactAccount account, Supplier<Path> cacheBuilder) {
     super(toIvyAccount(account), cacheBuilder);
   }
 
@@ -58,6 +58,7 @@ public class MavenArtifactCredentials extends IvyArtifactCredentials {
     IvySettings settings = new IvySettings();
     settings.setResolvers(resolvers);
 
+    ivy.setName(maven.getName());
     ivy.setSettings(settings);
 
     return ivy;
