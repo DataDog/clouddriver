@@ -22,37 +22,18 @@ stages:
   variables:
     GRADLE: "./gradlew -I gradle/init-publish.gradle --no-daemon --max-workers=1"
 
-# I don't think this is necessary, if anything we'd maybe run assemble or something
-# but its going to change on nearly any file change, so we lose our caching
-# maybe using it as a precooked gradle cache? but at that point why not jsut use gitlabs
-# caches?
-ci-image:
-  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
-  stage: ci-image
-  only:
-    changes:
-      - Dockerfile
-    refs:
-      - datadog-build
-      - engtools/243/gitlab_builds_for_clouddriver
-  tags: ['runner:docker', 'size:large']
-  script:
-    - docker build --tag 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/clouddriver:latest .
-    - docker push 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/clouddriver:latest
-
 assemble:
   extends: .gradle-job
   stage: assemble
   script:
     - $GRADLE assemble
 
-build:
+build-and-test:
   extends: .gradle-job
   stage: build
   script:
     - $GRADLE build
 
-# TODO set version off of tag -Prelease.useLastTag
 build-deb:
   extends: .gradle-job
   stage: build
@@ -60,18 +41,9 @@ build-deb:
     paths:
       - ./clouddriver-web/build/distributions/*.deb
   script:
-    - $GRADLE buildDeb -x test
+    - $GRADLE buildDeb -x test -Prelease.useLastTag
 
-build-all:
-  extends: .gradle-job
-  stage: build
-  artifacts:
-    paths:
-      - ./clouddriver-web/build/distributions/*.deb
-  script:
-    - $GRADLE buildDeb build -Prelease.useLastTag
-
-release-deb:
+upload-debian-package:
   extends: .dd-package.upload-debian-package
   # XXX remove before merge
   only:
@@ -82,8 +54,8 @@ release-deb:
   #   - tags
   #  except:
   #  - /^(?!datadog-build).+@/
-  dependencies:
-    - build-deb
+  #  dependencies:
+  #  - build-deb
   variables:
     DEB_PATH: './clouddriver-web/build/distributions/*.deb'
 
