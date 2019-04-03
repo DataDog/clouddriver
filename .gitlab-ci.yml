@@ -1,0 +1,55 @@
+include:
+  - remote: 'https://gitlab-templates.ddbuild.io/dd-package/v1/template.yml'
+  - remote: 'https://gitlab-templates.ddbuild.io/slack-notifier/v1/template.yml'
+
+stages:
+  - ci-image
+  - assemble
+  - build
+  - release
+  - notify
+
+.gradle-job:
+  image: openjdk:8
+  tags: ['runner:main', 'size:large']
+  before_script:
+    - export GRADLE_USER_HOME=`pwd`/.gradle
+    - echo $GRADLE_USER_HOME
+  cache:
+    paths:
+      - .gradle/wrapper
+      - .gradle/caches
+  variables:
+    GRADLE: "./gradlew -I gradle/init-publish.gradle --no-daemon --max-workers=1"
+
+assemble:
+  extends: .gradle-job
+  stage: assemble
+  script:
+    - $GRADLE assemble
+
+build-and-test:
+  extends: .gradle-job
+  stage: build
+  script:
+    - $GRADLE build
+
+build-deb:
+  extends: .gradle-job
+  stage: build
+  artifacts:
+    paths:
+      - ./clouddriver-web/build/distributions/*.deb
+  script:
+    - $GRADLE buildDeb -x test -Prelease.useLastTag
+
+upload-debian-package:
+  extends: .dd-package.upload-debian-package
+  only:
+    - datadog-build
+  variables:
+    DEB_PATH: './clouddriver-web/build/distributions/*.deb'
+
+on-failure:
+  extends: .slack-notifier.on-failure
+
