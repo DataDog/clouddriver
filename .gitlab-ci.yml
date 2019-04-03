@@ -45,17 +45,8 @@ build-deb:
 
 upload-debian-package:
   extends: .dd-package.upload-debian-package
-  # XXX remove before merge
   only:
-    - engtools/243/gitlab_builds_for_clouddriver
-  # only run this on tags on commits that are on the datadog-build branch
-  # XXX UNCOMMENT BEFORE MERGE
-  # only:
-  #   - tags
-  #  except:
-  #  - /^(?!datadog-build).+@/
-  #  dependencies:
-  #  - build-deb
+    - datadog-build
   variables:
     DEB_PATH: './clouddriver-web/build/distributions/*.deb'
 
