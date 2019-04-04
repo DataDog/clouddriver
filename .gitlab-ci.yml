@@ -3,8 +3,6 @@ include:
   - remote: 'https://gitlab-templates.ddbuild.io/slack-notifier/v1/template.yml'
 
 stages:
-  - ci-image
-  - assemble
   - build
   - release
   - notify
@@ -21,12 +19,6 @@ stages:
       - .gradle/caches
   variables:
     GRADLE: "./gradlew -I gradle/init-publish.gradle --no-daemon --max-workers=1"
-
-assemble:
-  extends: .gradle-job
-  stage: assemble
-  script:
-    - $GRADLE assemble
 
 build-and-test:
   extends: .gradle-job
