@@ -32,7 +32,7 @@ import java.util.HashSet;
 import static com.netflix.spinnaker.cats.agent.AgentDataType.Authority.AUTHORITATIVE;
 
 public class CustomKubernetesCachingAgentFactory {
-  public static KubernetesV2OnDemandCachingAgent create(
+  public static KubernetesV2CachingAgent create(
       KubernetesKind kind,
       KubernetesNamedAccountCredentials<KubernetesV2Credentials> namedAccountCredentials,
       KubernetesResourcePropertyRegistry propertyRegistry,
@@ -52,7 +52,7 @@ public class CustomKubernetesCachingAgentFactory {
     );
   }
 
-  private static class Agent extends KubernetesV2OnDemandCachingAgent {
+  private static class Agent extends KubernetesV2CachingAgent {
     private final KubernetesKind kind;
 
     Agent(
