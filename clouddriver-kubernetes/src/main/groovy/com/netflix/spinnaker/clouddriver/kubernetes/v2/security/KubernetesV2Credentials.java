@@ -563,12 +563,15 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
   private <T> T runAndRecordMetrics(String action, List<KubernetesKind> kinds, String namespace, Supplier<T> op) {
     T result = null;
     Throwable failure = null;
+    Boolean resourceNotFound = false;
     KubectlException apiException = null;
     long startTime = clock.monotonicTime();
     try {
       result = op.get();
     } catch (KubectlException e) {
       apiException = e;
+    } catch (KubectlJobExecutor.NoResourceTypeException e) {
+      resourceNotFound = true;
     } catch (Exception e) {
       failure = e;
     } finally {
@@ -581,8 +584,11 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
       }
       tags.put("account", accountName);
       tags.put("namespace", StringUtils.isEmpty(namespace) ? "none" : namespace);
-      if (failure == null) {
+      if (failure == null && !resourceNotFound) {
         tags.put("success", "true");
+      } else if (resourceNotFound) {
+        tags.put("success", "false");
+        tags.put("reason", "resource not found");
       } else {
         tags.put("success", "false");
         tags.put("reason", failure.getClass().getSimpleName() + ": " + failure.getMessage());
@@ -590,9 +596,8 @@ public class KubernetesV2Credentials implements KubernetesCredentials {
 
       registry.timer(registry.createId("kubernetes.api", tags))
           .record(clock.monotonicTime() - startTime, TimeUnit.NANOSECONDS);
-
       if (failure != null) {
-        throw new KubectlJobExecutor.KubectlException("Failure running " + action + " on " + kinds + ": " + failure.getMessage(), failure);
+        throw new KubectlJobExecutor.KubectlException("Failure running " + action + " on account " + accountName + " for " + kinds + ": " + failure.getMessage(), failure);
       } else if (apiException != null) {
         throw apiException;
       } else {
