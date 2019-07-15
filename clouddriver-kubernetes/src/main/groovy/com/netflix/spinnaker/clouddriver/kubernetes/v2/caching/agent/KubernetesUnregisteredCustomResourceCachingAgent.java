@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 import static com.netflix.spinnaker.cats.agent.AgentDataType.Authority.AUTHORITATIVE;
 
 @Slf4j
-public class KubernetesUnregisteredCustomResourceCachingAgent extends KubernetesV2CachingAgent {
+public class KubernetesUnregisteredCustomResourceCachingAgent extends KubernetesV2OnDemandCachingAgent {
   KubernetesUnregisteredCustomResourceCachingAgent(KubernetesNamedAccountCredentials<KubernetesV2Credentials> namedAccountCredentials,
       KubernetesResourcePropertyRegistry propertyRegistry,
       ObjectMapper objectMapper,
